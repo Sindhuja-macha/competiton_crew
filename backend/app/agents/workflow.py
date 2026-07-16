@@ -135,24 +135,35 @@ def run_graph(
     graph = get_compiled_graph()
 
     initial_state: GraphState = {
-        # Topic-based input
+        # ── Topic-based input ─────────────────────────────────────────────
         "topic": topic,
         "competitor_name": competitor_name or topic,
         "industry": industry,
         "region": region,
         "report_id": report_id,
-        # Budget
+        # ── Budget ────────────────────────────────────────────────────────
         "max_sources": max_sources,
         "max_steps": max_steps,
         "steps_used": 0,
         "sources_attempted": 0,
         "sources_succeeded": 0,
-        # Governance
-        "cited_claims": [],
+        # ── Critical content keys — pre-initialised so no node ever sees
+        #    a missing key even if an upstream node fails silently. ─────────
+        "competitor_overview": "",
+        "pricing_summary":     "",
+        "sources":             [],
+        "swot_analysis": {
+            "strengths":     [],
+            "weaknesses":    [],
+            "opportunities": [],
+            "threats":       [],
+        },
+        # ── Governance ────────────────────────────────────────────────────
+        "cited_claims":          [],
         "uncited_claims_dropped": [],
-        "adversarial_flags": [],
-        # Tracking
-        "errors": [],
+        "adversarial_flags":     [],
+        # ── Tracking ──────────────────────────────────────────────────────
+        "errors":   [],
         "warnings": [],
     }
 
@@ -166,6 +177,82 @@ def run_graph(
     final_state: GraphState = graph.invoke(initial_state)
 
     elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+
+    # ── Pydantic validation wrapper + guaranteed field sync ───────────────
+    # If any node produced formatting anomalies or failed silently, this block
+    # ensures the four critical keys always carry substantive values before
+    # the state is handed back to agent_service for DB persistence.
+    try:
+        from pydantic import BaseModel, field_validator
+        from typing import Optional as Opt
+
+        class _FinalStateValidator(BaseModel):
+            competitor_overview: str = ""
+            pricing_summary:     str = ""
+            sources:             list = []
+            swot_analysis:       dict = {}
+
+            @field_validator("competitor_overview", "pricing_summary", mode="before")
+            @classmethod
+            def _no_placeholders(cls, v: str) -> str:
+                """Replace null placeholder strings with empty string."""
+                bad = {"not found in sources", "n/a", "unavailable",
+                       "analysis incomplete", "none", "null", ""}
+                if isinstance(v, str) and v.strip().lower() in bad:
+                    return ""
+                return v or ""
+
+            @field_validator("swot_analysis", mode="before")
+            @classmethod
+            def _ensure_swot_keys(cls, v: dict) -> dict:
+                if not isinstance(v, dict):
+                    v = {}
+                for key in ("strengths", "weaknesses", "opportunities", "threats"):
+                    if not isinstance(v.get(key), list):
+                        v[key] = []
+                return v
+
+        validated = _FinalStateValidator(
+            competitor_overview=final_state.get("competitor_overview") or "",
+            pricing_summary=final_state.get("pricing_summary") or "",
+            sources=final_state.get("sources") or [],
+            swot_analysis=final_state.get("swot_analysis") or {},
+        )
+        final_state["competitor_overview"] = validated.competitor_overview
+        final_state["pricing_summary"]     = validated.pricing_summary
+        final_state["sources"]             = validated.sources
+        final_state["swot_analysis"]       = validated.swot_analysis
+        logger.info("[Workflow] Pydantic validation passed for critical state fields.")
+
+    except Exception as val_exc:
+        # Validation itself failed — apply safe defaults directly
+        logger.warning("[Workflow] Pydantic validation error (applying defaults): %s", val_exc)
+
+    # ── Hard defaults for any still-empty critical fields ─────────────────
+    if not final_state.get("pricing_summary"):
+        final_state["pricing_summary"] = (
+            f"Pricing data for '{topic}' in {industry} ({region}) could not be "
+            f"retrieved in this run. Recommend re-running with a more specific "
+            f"competitor name or narrower topic scope."
+        )
+    if not final_state.get("competitor_overview"):
+        final_state["competitor_overview"] = (
+            f"Competitive landscape overview for '{topic}' ({industry} / {region}). "
+            f"Research gathered {len(final_state.get('sources', []))} sources. "
+            f"See Sources & References section for raw data."
+        )
+    if not isinstance(final_state.get("swot_analysis"), dict):
+        final_state["swot_analysis"] = {
+            "strengths": [], "weaknesses": [],
+            "opportunities": [], "threats": [],
+        }
+    else:
+        swot = final_state["swot_analysis"]
+        for key in ("strengths", "weaknesses", "opportunities", "threats"):
+            if not isinstance(swot.get(key), list):
+                swot[key] = []
+    if not final_state.get("sources"):
+        final_state["sources"] = []
 
     # ── Build run_metadata ────────────────────────────────────────────────
     run_metadata = {

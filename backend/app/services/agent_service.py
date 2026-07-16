@@ -305,6 +305,26 @@ def _run_langgraph_with_tracking(report: Report, tracker: _ExecutionTracker, db)
                     details={"issues": final_state.get("peer_review_issues", [])},
                 )
 
+    # ── Guarantee critical fields survive the stream-merge path ──────────
+    # stream_mode="updates" applies each node's output as a delta. If a node
+    # omits a key (e.g. writer omits pricing_summary), that key reverts to
+    # whatever was in initial_state — which is empty / None. Defend here so
+    # agent_service.run_workflow_background always sees populated values.
+    if not final_state.get("pricing_summary"):
+        final_state["pricing_summary"] = (
+            "Pricing data could not be retrieved. "
+            "Check that the research node completed successfully."
+        )
+    if not final_state.get("swot_analysis"):
+        final_state["swot_analysis"] = {
+            "strengths":     [],
+            "weaknesses":    [],
+            "opportunities": [],
+            "threats":       [],
+        }
+    if not final_state.get("sources"):
+        final_state["sources"] = []
+
     return final_state
 
 

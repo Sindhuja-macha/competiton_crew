@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Search, Loader2, CheckCircle2, XCircle, Clock,
   TrendingUp, TrendingDown, Newspaper,
@@ -146,8 +148,25 @@ function BriefingSection({ section, index }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-          {section.content}
+        <div className="w-full overflow-x-hidden break-words
+                        prose prose-sm prose-invert max-w-none
+                        [&_a]:text-primary [&_a]:underline [&_a:hover]:opacity-80
+                        [&_p]:text-foreground/80 [&_p]:leading-relaxed [&_p]:mb-2
+                        [&_ul]:space-y-1 [&_li]:text-foreground/80 [&_li]:text-sm
+                        [&_strong]:text-foreground">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer"
+                   className="text-primary underline hover:opacity-80 break-all">
+                  {children}
+                </a>
+              ),
+            }}
+          >
+            {section.content}
+          </ReactMarkdown>
         </div>
       </CardContent>
     </Card>
@@ -581,8 +600,14 @@ export default function Dashboard() {
                           </div>
                           <ul className="space-y-1">
                             {(activeReport.swot_analysis[key] || []).map((item, i) => (
-                              <li key={i} className="text-xs text-foreground/70 flex items-start gap-1.5">
-                                <ChevronRight className="h-3 w-3 shrink-0 mt-0.5 opacity-50" />{item}
+                              <li key={i} className="text-xs text-foreground/70 flex items-start gap-1.5 break-words overflow-x-hidden">
+                                <ChevronRight className="h-3 w-3 shrink-0 mt-0.5 opacity-50" />
+                                <span className="break-words overflow-x-hidden prose prose-sm prose-invert max-w-none [&_a]:text-primary [&_a]:underline [&_p]:inline [&_p]:m-0">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}
+                                    components={{ a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline break-all">{children}</a>, p: ({ children }) => <>{children}</> }}>
+                                    {item}
+                                  </ReactMarkdown>
+                                </span>
                               </li>
                             ))}
                           </ul>

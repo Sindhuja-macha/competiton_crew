@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   FileText, Search, RefreshCw, Trash2, Eye,
   ChevronRight, Clock, CheckCircle2, XCircle, Loader2,
   TrendingUp, TrendingDown, Target, Shield, ExternalLink,
   X, Newspaper, Lightbulb, BarChart3, BookOpen,
   ShieldCheck, ShieldAlert, FileCheck, AlertTriangle,
-  Download,
+  Download, DollarSign,
 } from "lucide-react";
 
 import { reportsApi } from "@/api/client";
@@ -39,6 +41,35 @@ const SWOT_CONFIG = [
   { key: "opportunities", label: "Opportunities", icon: Target,       cls: "swot-opportunities", iconCls: "text-blue-400"    },
   { key: "threats",       label: "Threats",       icon: Shield,       cls: "swot-threats",       iconCls: "text-yellow-400"  },
 ];
+
+// ── Markdown renderer — converts [Read Source](url) into clickable links ─────
+// Replaces raw whitespace-pre-wrap which shows URLs as plain clipped text.
+function MarkdownRenderer({ content }) {
+  if (!content) return null;
+  return (
+    <div className="prose prose-sm prose-invert max-w-none break-words overflow-x-hidden
+                    [&_a]:text-primary [&_a]:underline [&_a:hover]:opacity-80
+                    [&_p]:text-foreground/80 [&_p]:leading-relaxed [&_p]:mb-2
+                    [&_ul]:space-y-1 [&_li]:text-foreground/80 [&_li]:text-sm
+                    [&_strong]:text-foreground [&_h1]:text-base [&_h2]:text-sm
+                    [&_code]:bg-muted [&_code]:px-1 [&_code]:rounded">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Open all links in new tab safely
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer"
+               className="text-primary underline hover:opacity-80 break-all">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 // ── Governance Panel ─────────────────────────────────────────────────────────
 function GovernancePanel({ report }) {
@@ -130,9 +161,9 @@ function GovernancePanel({ report }) {
 function BriefingSectionBlock({ section }) {
   if (!section?.content) return <p className="text-sm text-muted-foreground">Not available.</p>;
   return (
-    <div className="space-y-3">
-      <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
-        {section.content}
+    <div className="space-y-3 w-full overflow-x-hidden">
+      <div className="break-words overflow-x-hidden">
+        <MarkdownRenderer content={section.content} />
       </div>
       {section.cited_claims?.length > 0 && (
         <details className="group">
@@ -143,7 +174,7 @@ function BriefingSectionBlock({ section }) {
           </summary>
           <ul className="mt-2 space-y-1.5 pl-4">
             {section.cited_claims.map((c, i) => (
-              <li key={i} className="text-xs text-foreground/70">
+              <li key={i} className="text-xs text-foreground/70 break-words">
                 <span className={cn(
                   "inline-block w-2 h-2 rounded-full mr-1.5",
                   c.verified ? "bg-emerald-400" : "bg-yellow-400"
@@ -151,7 +182,7 @@ function BriefingSectionBlock({ section }) {
                 {c.claim}
                 {c.source_url && (
                   <a href={c.source_url} target="_blank" rel="noopener noreferrer"
-                    className="ml-1.5 text-primary hover:underline">
+                    className="ml-1.5 text-primary hover:underline break-all">
                     [{c.source_title || "source"}]
                   </a>
                 )}
@@ -184,7 +215,7 @@ function ReportDetail({ report, onClose }) {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed top-0 right-0 h-screen w-full max-w-2xl z-50 glass border-l border-border/50 flex flex-col"
+      className="fixed top-0 right-0 h-screen w-full max-w-2xl z-50 glass border-l border-border/50 flex flex-col overflow-x-hidden"
     >
       {/* Header */}
       <div className="flex items-start justify-between p-6 border-b border-border/50 shrink-0">
@@ -211,13 +242,14 @@ function ReportDetail({ report, onClose }) {
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
-        <ScrollArea className="flex-1">
-          <div className="p-6 space-y-6">
+        <ScrollArea className="flex-1 overflow-x-hidden">
+          <div className="p-6 space-y-6 w-full overflow-x-hidden break-words">
             <Tabs defaultValue="briefing">
-              <TabsList className="w-full grid grid-cols-5">
+              <TabsList className="w-full grid grid-cols-6">
                 <TabsTrigger value="briefing">Briefing</TabsTrigger>
-                <TabsTrigger value="governance">Governance</TabsTrigger>
+                <TabsTrigger value="pricing">Pricing</TabsTrigger>
                 <TabsTrigger value="swot">SWOT</TabsTrigger>
+                <TabsTrigger value="governance">Governance</TabsTrigger>
                 <TabsTrigger value="news">News</TabsTrigger>
                 <TabsTrigger value="sources">Sources</TabsTrigger>
               </TabsList>
@@ -283,6 +315,50 @@ function ReportDetail({ report, onClose }) {
                 )}
               </TabsContent>
 
+              {/* ── Pricing Analysis tab ── */}
+              <TabsContent value="pricing" className="mt-4 space-y-4 w-full overflow-x-hidden">
+                {full.status !== "completed" ? (
+                  <p className="text-sm text-muted-foreground">Pricing data not yet available.</p>
+                ) : (
+                  <>
+                    {/* Pricing section from writer briefing */}
+                    {full.briefing_section_pricing?.content && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-semibold">
+                          <DollarSign className="h-4 w-4 text-primary" />
+                          Competitor Pricing & Product Moves
+                        </div>
+                        <div className="break-words overflow-x-hidden w-full">
+                          <MarkdownRenderer content={full.briefing_section_pricing.content} />
+                        </div>
+                      </div>
+                    )}
+                    {/* Raw pricing summary from research */}
+                    {full.pricing_summary && (
+                      <>
+                        {full.briefing_section_pricing?.content && (
+                          <div className="border-t border-border/40 pt-4" />
+                        )}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-semibold">
+                            <BarChart3 className="h-4 w-4 text-primary" />
+                            Raw Pricing Intelligence
+                          </div>
+                          <div className="break-words overflow-x-hidden w-full p-3 rounded-lg bg-muted/20 border border-border/40">
+                            <MarkdownRenderer content={full.pricing_summary} />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {!full.briefing_section_pricing?.content && !full.pricing_summary && (
+                      <p className="text-sm text-muted-foreground">
+                        No pricing data was captured for this run. Try a more specific topic or competitor.
+                      </p>
+                    )}
+                  </>
+                )}
+              </TabsContent>
+
               {/* ── Governance tab ── */}
               <TabsContent value="governance" className="mt-4">
                 {full.status === "completed"
@@ -303,8 +379,11 @@ function ReportDetail({ report, onClose }) {
                         </div>
                         <ul className="space-y-1">
                           {(full.swot_analysis[key] || []).map((item, i) => (
-                            <li key={i} className="text-xs text-foreground/70 flex items-start gap-1.5">
-                              <ChevronRight className="h-3 w-3 shrink-0 mt-0.5 opacity-50" />{item}
+                            <li key={i} className="text-xs text-foreground/70 flex items-start gap-1.5 break-words overflow-x-hidden">
+                              <ChevronRight className="h-3 w-3 shrink-0 mt-0.5 opacity-50" />
+                              <span className="break-words overflow-x-hidden">
+                                <MarkdownRenderer content={item} />
+                              </span>
                             </li>
                           ))}
                         </ul>

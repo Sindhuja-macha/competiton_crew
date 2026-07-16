@@ -44,7 +44,8 @@ def _build_client(model: str) -> ChatOpenAI:
         openai_api_key=_settings.openrouter_api_key,
         openai_api_base=_settings.openrouter_base_url,
         temperature=0.3,
-        max_tokens=4096,
+        max_tokens=2048,        # reduced from 4096 — responses complete faster;
+                                # our structured JSON outputs never exceed ~1500 tokens
         default_headers={
             "HTTP-Referer": "https://competitive-intel.app",
             "X-Title": "Competitive Intelligence Briefing Crew",
@@ -96,7 +97,7 @@ def chat_with_fallback(messages: list[Any]) -> Any:
 @retry(
     retry=retry_if_exception_type((Exception,)),
     stop=stop_after_attempt(2),
-    wait=wait_exponential(multiplier=1, min=2, max=8),
+    wait=wait_exponential(multiplier=1, min=1, max=4),  # tightened: was min=2 max=8
     reraise=True,
 )
 def _retry_on_primary(llm: ChatOpenAI, messages: list[Any]) -> Any:
@@ -105,8 +106,8 @@ def _retry_on_primary(llm: ChatOpenAI, messages: list[Any]) -> Any:
 
 @retry(
     retry=retry_if_exception_type((Exception,)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=12),
+    stop=stop_after_attempt(2),                         # reduced from 3 — fail faster
+    wait=wait_exponential(multiplier=1, min=1, max=6),  # tightened: was min=2 max=12
     reraise=True,
 )
 def _retry_on_fallback(llm: ChatOpenAI, messages: list[Any]) -> Any:

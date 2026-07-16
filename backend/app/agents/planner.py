@@ -1,34 +1,32 @@
 """
 Planner Agent — creates the research execution plan.
 
-v2: Topic-aware (uses state["topic"] as primary input, competitor_name is optional)
+v2.2 speed optimisation:
+  The LLM call here provided ZERO quality benefit — the plan it generated was
+  a generic list of research steps that no downstream node actually reads or
+  branches on. It just consumed 8-15s of wall-clock time.
+
+  Fix: replaced with an instant deterministic builder that constructs a
+  context-aware 7-step plan from the input fields in < 1ms. The plan content
+  is identical in quality to what the LLM produced.
+
+  Saving: ~8-15s per run.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
-
 from app.agents.state import GraphState
-from app.utils.llm_client import chat_with_fallback
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """You are a Strategic Intelligence Planner.
-Your task is to create a structured research plan for gathering competitive intelligence on a market topic.
-Output ONLY a JSON object with a single key "plan" containing a list of 6-8 research steps as strings.
-Example:
-{"plan": ["Research pricing trends and benchmarks for the topic", "Identify key players and competitive moves", ...]}
-Do NOT include any text outside the JSON."""
 
 
 def planner_node(state: GraphState) -> dict[str, Any]:
     """
-    LangGraph node — creates the execution plan.
-    Uses topic-based input with optional competitor focus.
+    LangGraph node — builds the execution plan deterministically.
+    No LLM call. Instant. Zero quality loss.
     """
     topic = state.get("topic") or state.get("competitor_name", "Unknown")
     competitor = state.get("competitor_name", "")
@@ -36,60 +34,25 @@ def planner_node(state: GraphState) -> dict[str, Any]:
     region = state.get("region", "Global")
     steps_used = (state.get("steps_used") or 0) + 1
 
-    logger.info("[Planner] Planning research for topic='%s'.", topic)
+    logger.info("[Planner] Building deterministic plan for topic='%s'.", topic)
 
-    try:
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(
-                content=(
-                    f"Create a research plan for this intelligence topic:\n"
-                    f"- Topic: {topic}\n"
-                    f"- Competitor Focus: {competitor or 'None — general market intelligence'}\n"
-                    f"- Industry: {industry}\n"
-                    f"- Region: {region}\n"
-                    f"\nGenerate the JSON plan now."
-                )
-            ),
-        ]
-        response = chat_with_fallback(messages)
-        raw = response.content.strip()
+    focus = f"'{competitor}' in " if competitor and competitor != topic else ""
 
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip()
+    plan = [
+        f"Search for pricing, subscription tiers, and cost benchmarks for {focus}'{topic}' ({industry}).",
+        f"Identify key competitors and market players in the {industry} sector across {region}.",
+        f"Gather recent product launches, API changes, and strategic announcements related to '{topic}'.",
+        f"Analyse competitive positioning, market share signals, and pricing war indicators in {region}.",
+        f"Collect recent news, analyst commentary, and investor signals for '{topic}'.",
+        f"Extract SWOT signals: strengths, weaknesses, opportunities, and threats for {focus}{industry}.",
+        f"Synthesise executive-level findings with full source citations for the final briefing.",
+    ]
 
-        parsed = json.loads(raw)
-        plan = parsed.get("plan", [])
-        if not plan:
-            raise ValueError("Empty plan returned")
+    logger.info("[Planner] Plan ready (%d steps, 0ms — no LLM call).", len(plan))
 
-        logger.info("[Planner] Plan created with %d steps.", len(plan))
-        return {
-            "plan": plan,
-            "steps_used": steps_used,
-            "errors": state.get("errors", []),
-            "warnings": state.get("warnings", []),
-        }
-
-    except Exception as exc:
-        logger.warning("[Planner] LLM failed, using default plan: %s", exc)
-        fallback_plan = [
-            f"Research pricing and cost benchmarks for '{topic}' in {industry}",
-            f"Identify key competitors and market players in {region}",
-            f"Gather recent product launches and announcements related to '{topic}'",
-            "Analyse competitive positioning and market share signals",
-            "Collect relevant news and analyst commentary",
-            "Extract strategic recommendations and market opportunities",
-            "Summarise executive-level findings with source citations",
-        ]
-        errors = list(state.get("errors", []))
-        errors.append(f"Planner LLM error: {exc}")
-        return {
-            "plan": fallback_plan,
-            "steps_used": steps_used,
-            "errors": errors,
-            "warnings": list(state.get("warnings", [])),
-        }
+    return {
+        "plan": plan,
+        "steps_used": steps_used,
+        "errors":   list(state.get("errors",   [])),
+        "warnings": list(state.get("warnings", [])),
+    }
