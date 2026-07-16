@@ -1,0 +1,23 @@
+# Sensitive environment variables
+.env
+.env.local
+backend/.env
+frontend/.env
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Production builds
+dist/
+frontend/dist/
+build/
+
+# IDE and System files
+.DS_Store
+.vscode/
+
+# Local databases / logs
+*.db
+*.log
+data/

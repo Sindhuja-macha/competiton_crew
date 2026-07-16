@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── ShadCN CSS Variables — Dark Theme ─────────────────────────────────── */
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+
+    --card: 224 71% 6%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 224 71% 6%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 234 89% 74%;
+    --primary-foreground: 224 71% 4%;
+
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 213 31% 91%;
+
+    --muted: 215 28% 12%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 215 28% 17%;
+    --accent-foreground: 213 31% 91%;
+
+    --destructive: 0 63% 55%;
+    --destructive-foreground: 213 31% 91%;
+
+    --border: 215 28% 15%;
+    --input: 215 28% 15%;
+    --ring: 234 89% 74%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background: linear-gradient(135deg, #0a0f1e 0%, #0d1117 50%, #0a0f1e 100%);
+    min-height: 100vh;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+/* ── Glassmorphism utilities ────────────────────────────────────────────── */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .glass-hover {
+    transition: all 0.2s ease;
+  }
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.13);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .card-glass {
+    @apply glass rounded-xl p-6;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    background: linear-gradient(135deg, #818cf8 0%, #c084fc 50%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Status badge variants */
+  .status-pending  { @apply bg-yellow-500/15 text-yellow-400 border border-yellow-500/30; }
+  .status-running  { @apply bg-blue-500/15 text-blue-400 border border-blue-500/30; }
+  .status-completed { @apply bg-emerald-500/15 text-emerald-400 border border-emerald-500/30; }
+  .status-failed   { @apply bg-red-500/15 text-red-400 border border-red-500/30; }
+
+  /* Agent step indicator */
+  .agent-step-queued    { @apply bg-gray-500/20 border-gray-500/40 text-gray-400; }
+  .agent-step-running   { @apply bg-blue-500/20 border-blue-500/40 text-blue-300 animate-pulse-slow; }
+  .agent-step-completed { @apply bg-emerald-500/20 border-emerald-500/40 text-emerald-300; }
+  .agent-step-failed    { @apply bg-red-500/20 border-red-500/40 text-red-300; }
+
+  /* Sidebar active link */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground transition-all duration-200;
+  }
+  .nav-link:hover {
+    @apply text-foreground bg-white/5;
+  }
+  .nav-link.active {
+    @apply text-foreground bg-primary/10 border border-primary/20;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+  }
+
+  /* SWOT quadrant colours */
+  .swot-strengths     { @apply border-emerald-500/30 bg-emerald-500/5; }
+  .swot-weaknesses    { @apply border-red-500/30 bg-red-500/5; }
+  .swot-opportunities { @apply border-blue-500/30 bg-blue-500/5; }
+  .swot-threats       { @apply border-yellow-500/30 bg-yellow-500/5; }
+}

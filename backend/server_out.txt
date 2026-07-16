@@ -1,0 +1,3 @@
+2026-07-16 08:02:03 | INFO     | app.main:38 - Starting Competitive Intelligence Briefing Crew v1.0.0
+2026-07-16 08:02:03 | INFO     | app.main:40 - Database tables ensured.
+INFO:     127.0.0.1:55776 - "GET /health HTTP/1.1" 200 OK
